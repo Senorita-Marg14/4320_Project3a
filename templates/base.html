@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Stock Data Visualizer {% endblock %}</title>
+</head>
+    <header>
+        <h1>Stock Data Visualizer</h1>
+    </header>
+
+<body>
+    <hr>
+    <div class="content">
+
+        {% for message in get_flashed_messages() %}
+            <div class="alert">{{ message }}</div>
+        {% endfor %}
+        {% block content %} {% endblock %}
+    </div>
+
+    <div id="chart">
+        <embed type="image/svg+xml" src="{{ chart|safe }}" />
+    </div>
+</body>
+
+</html>
