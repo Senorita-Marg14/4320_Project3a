@@ -14,6 +14,7 @@ API_KEY = os.getenv("API_KEY")
 
 #used to generate the chart in the html page
 app = Flask(__name__)
+app.config["DEBUG"] = True
 app.config["SECRET_KEY"] = 'your secret key'
 
 #functions from Alpha Vantage Website 
