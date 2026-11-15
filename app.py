@@ -165,4 +165,4 @@ def index():
     return render_template("index.html", symbols=symbols, chart=chart)
 
 
-app.run(app.run(port=5008))
+app.run(host="0.0.0.0")
