@@ -4,6 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Stock Data Visualizer {% endblock %}</title>
+    <style>
+        form {
+            display: flex;
+            flex-direction: column;
+            background-color: lightgrey;
+            padding: 4px;
+            gap: 5px;
+            font-family: 'Times New Roman', Times, serif;
+        }
+        .note {
+            display: flex;
+            background-color: yellow;
+            margin: 8px;
+        }
+
+        .alert {
+            display: flex;
+            background-color: lightcoral;
+            margin: 8px;
+        }
+
+    </style>
 </head>
     <header>
         <h1>Stock Data Visualizer</h1>
