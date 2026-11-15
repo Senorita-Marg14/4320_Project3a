@@ -1,7 +1,7 @@
 #imports and setup stuff
 import pygal 
 from pygal.style import *
-import lxml 
+
 import requests
 from flask import Flask, render_template, request, flash, url_for, redirect
 from datetime import datetime
@@ -14,6 +14,7 @@ API_KEY = os.getenv("API_KEY")
 
 #used to generate the chart in the html page
 app = Flask(__name__)
+app.config["SECRET_KEY"] = 'your secret key'
 
 #functions from Alpha Vantage Website 
 TIME_SERIES_OPTIONS = {
@@ -23,87 +24,42 @@ TIME_SERIES_OPTIONS = {
     "4": ("TIME_SERIES_MONTHLY", "Monthly Time Series")
 }
 
+#get the symbols from the stocks.csv file 
+def get_symbols():
+    symbols = []
+    file = open ("stocks.csv", "r")
+    lines = file.readlines()
+    file.close()
 
-#USER INPUTS
-#ask the user to enter the stock symbol for the company they want data for
-    #only letters, has to be less than or equal 8
-def get_stock_symbol():
-    check_letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    while True:
-        user_input = input("\nEnter the stock symbol you are looking for: ").strip()
-        user_symbol_choice = user_input.upper()
+    for line in lines[1:]:
+        symbol = line.split(",")[0].strip()
+        if symbol != "":
+            symbols.append(symbol)
+    symbols.sort()
+    return symbols
 
-        is_letters = True
-        for i in user_symbol_choice:
-            if i not in check_letters:
-                is_letters = False
 
-        if len(user_symbol_choice) > 8 or len(user_symbol_choice) == 0:
-            print("Stock symbols must be between 1-8 letters long.")
-        elif is_letters == False:
-            print("Stock symbols can only contain letters.")
-        else:
-            return user_symbol_choice
-
-#ask the user for the chart type they would like
-def get_chart_type():
-    while True:
-        print("Chart Types\n-----------------")
-        print("1. Bar")
-        print("2. Line")
-        user_input = input("\nEnter the chart type you want (1,2): ")
-
-        if user_input == "1":
-            return "bar"
-            #return bar chart with pygal
-        elif user_input == "2":
-            return "line"
-            #return line chart with pygal
-        else:
-            print("\nPlease enter either 1 or 2.\n")
-
-#ask the user for the time series function they want the api to use
-def get_time_series():
-    while True:
-        #menu choices
-        print("\nSelect the time series for the chart you wish to generate\n---------------------")
-        print("NOTE: The free API key limits the amount of data returned \n Some options may not return all data.\n")
-        print("1. Intraday")
-        print("2. Daily")
-        print("3. Weekly")
-        print("4. Monthly")
-
-        user_input_timeseries = input("Enter a choice 1-4: ")
-        if user_input_timeseries not in ["1","2","3","4"]:
-            print("\nPlease enter 1, 2,3, or 4.")
-        else:
-            return user_input_timeseries
 
 #ask the user for the beginning date in YYYY-MM-DD format
 #make sure the date is in the right format
-def get_date_validate(user_input):
-    while True:
-        user_date_input = input(user_input).strip()
+def get_date_validate(user_date_input):
         try:
             validated_user_date = datetime.strptime(user_date_input, "%Y-%m-%d")
             return validated_user_date.date()
         except ValueError:
-            print("Please enter a valid date in the YYYY-MM-DD format.")
-
-#get the start date from user 
-def get_start_date():
-    return get_date_validate("Enter the start date in YYYY-MM-DD format: ")
-    
-
-#ask the user for the end date in YYYY-MM-DD format
-def get_end_date(start_date):
+            flash("Please enter a valid date in the YYYY-MM-DD format.")
+            return None
+#ask the user for the end date in YYYY-MM-DD format 
+def get_end_date(start_date, user_input):
     while True:
-        end_date = get_date_validate("Enter the end date in YYYY-MM-DD format: ")
+        end_date = get_date_validate(user_input)
         #the end date should not be before the begin date
+        if end_date is None:
+            return end_date
         if end_date >= start_date:
             return end_date
         else:
-            print("The end date cannot be before the start date.")
+            flash("The end date cannot be before the start date.")
 
 #api stuff 
 #gets the data using API key from Alpha Vantage Website
@@ -118,10 +74,10 @@ def get_api_data(symbol_choice, time_series_choice):
     data = response.json()
 
     if "Error Message" in data:
-        print(f"No data was found for the symbol {symbol_choice}. Please check your spelling.")
+        flash(f"No data was found for the symbol {symbol_choice}. Please check your spelling.")
         return None
     if data_key not in data:
-        print("There was an error getting your data from Alpha Vantage. Please try again.")
+        flash("There was an error getting your data from Alpha Vantage. Please try again.")
         return None
 
     return data[data_key]
@@ -169,39 +125,43 @@ def draw_graph(dates, stock_data, symbol_choice, start_date, end_date, chart_typ
     chart_object.add("Low", stock_data["low"])
     chart_object.add("Close", stock_data["close"])
 
-    chart_object.render_in_browser()
+    return chart_object.render_data_uri()
 
 
 #send the chart to the base.html and iopen it in the user browser
 
 #main function 
-def main():
-    print("Stock Data Visualizer\n------------------------")
+@app.route("/", methods=("GET", "POST"))
+def index():
+    symbols = get_symbols()
+    chart = None
 
-    if not API_KEY:
-        print("Please make sure you have a valid API key in the .env file")
-        return 
+    if request.method == "POST":
+        if not API_KEY:
+            flash("Please check that the API key is valid")
+            return render_template("index.html", symbols=symbols, chart=chart)
 
-    while True:
-        symbol_choice = get_stock_symbol()
-        chart_type = get_chart_type()
-        time_series_choice = get_time_series()
-        start_date = get_start_date()
-        end_date = get_end_date(start_date)
-        time_series = get_api_data(symbol_choice, time_series_choice)
+        symbol = request.form["symbol"]
+        chart_type = request.form["chart_type"]
+        time_series = request.form["time_series"]
+        start_date = get_date_validate(request.form["start_date"])
+        end_date = None
+        if start_date:
+            end_date = get_end_date(start_date, request.form["end_date"])
 
-        if time_series:
-            dates, stock_data = sort_api_data(time_series, start_date, end_date)
+        if start_date and end_date:
+            time_series = get_api_data(symbol, time_series)
 
-            if dates: 
-                draw_graph(dates, stock_data, symbol_choice, start_date, end_date, chart_type)
+            if time_series:
+                dates, stock_data = sort_api_data(time_series, start_date, end_date)
 
-            else: 
-                print("No data was found for that date range (possible free API date limit). Please try again.")
+                if dates: 
+                    chart = draw_graph(dates, stock_data, symbol, start_date, end_date, chart_type)
 
-        prompt_user = input("Would you like to view more stock data? (y/n):").strip().lower()
-        if prompt_user != "y":
-            print("Goodbye!")
-            break
+                else:
+                    flash("No data was found for that date range (possible limitation of free API key)")
 
-main()
+    return render_template("index.html", symbols=symbols, chart=chart)
+
+
+app.run(app.run(port=5008))
