@@ -61,6 +61,7 @@ def get_end_date(start_date, user_input):
             return end_date
         else:
             flash("The end date cannot be before the start date.")
+            return None
 
 #api stuff 
 #gets the data using API key from Alpha Vantage Website
